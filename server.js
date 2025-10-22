@@ -88,8 +88,8 @@ app.post('/upload/multiple', upload.array('files', 10), (req, res) => {
   });
 });
 
-// Capture all POST request data (without file requirement)
-app.post('/capture', (req, res) => {
+// Helper function to capture request data
+const captureRequestData = (req, res) => {
   const timestamp = Date.now();
   const requestData = {
     timestamp: timestamp,
@@ -126,7 +126,13 @@ app.post('/capture', (req, res) => {
       data: requestData
     });
   });
-});
+};
+
+// Capture GET request data (with full metadata)
+app.get('/capture', captureRequestData);
+
+// Capture all POST request data (without file requirement)
+app.post('/capture', captureRequestData);
 
 // List uploaded files
 app.get('/files', (req, res) => {
