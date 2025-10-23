@@ -155,6 +155,30 @@ app.get('/files', (req, res) => {
   });
 });
 
+// Get specific file content
+app.get('/files/:filename', (req, res) => {
+  const filePath = path.join(UPLOAD_DIR, req.params.filename);
+
+  // Security check: ensure the file path is within UPLOAD_DIR
+  const resolvedPath = path.resolve(filePath);
+  const resolvedUploadDir = path.resolve(UPLOAD_DIR);
+
+  if (!resolvedPath.startsWith(resolvedUploadDir)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  // Check if download query param is set
+  if (req.query.download === 'true') {
+    res.download(filePath);
+  } else {
+    res.sendFile(resolvedPath);
+  }
+});
+
 // List captured metadata
 app.get('/metadata', (req, res) => {
   fs.readdir(METADATA_DIR, (err, files) => {
