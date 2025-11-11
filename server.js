@@ -217,6 +217,22 @@ app.get('/metadata/:filename', (req, res) => {
   });
 });
 
+// Download PPTX file
+app.get('/download/pptx', (req, res) => {
+  const filePath = path.join(__dirname, 'files', 'dummy.pptx');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'PPTX file not found' });
+  }
+
+  res.download(filePath, 'dummy.pptx', (err) => {
+    if (err) {
+      console.error('Error downloading file:', err);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
