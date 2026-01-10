@@ -1,3 +1,13 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const METADATA_DIR = process.env.METADATA_DIR || './metadata';
+
 // ...existing code...
 
 // Download hello.sh file
