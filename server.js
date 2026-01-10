@@ -1,18 +1,5 @@
-// Download lol.sh file
-app.get('/download/lol', (req, res) => {
-  const filePath = path.join(__dirname, 'files', 'lol.sh');
+// ...existing code...
 
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Shell script not found' });
-  }
-
-  res.download(filePath, 'lol.sh', (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
-      res.status(500).json({ error: 'Failed to download file' });
-    }
-  });
-});
 // Download hello.sh file
 app.get('/download/hello', (req, res) => {
   const filePath = path.join(__dirname, 'files', 'hello.sh');
@@ -22,6 +9,22 @@ app.get('/download/hello', (req, res) => {
   }
 
   res.download(filePath, 'hello.sh', (err) => {
+    if (err) {
+      console.error('Error downloading file:', err);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+});
+
+// Download lol.sh file
+app.get('/download/lol', (req, res) => {
+  const filePath = path.join(__dirname, 'files', 'lol.sh');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Shell script not found' });
+  }
+
+  res.download(filePath, 'lol.sh', (err) => {
     if (err) {
       console.error('Error downloading file:', err);
       res.status(500).json({ error: 'Failed to download file' });
