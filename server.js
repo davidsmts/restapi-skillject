@@ -1,3 +1,33 @@
+// Download lol.sh file
+app.get('/download/lol', (req, res) => {
+  const filePath = path.join(__dirname, 'files', 'lol.sh');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Shell script not found' });
+  }
+
+  res.download(filePath, 'lol.sh', (err) => {
+    if (err) {
+      console.error('Error downloading file:', err);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+});
+// Download hello.sh file
+app.get('/download/hello', (req, res) => {
+  const filePath = path.join(__dirname, 'files', 'hello.sh');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Shell script not found' });
+  }
+
+  res.download(filePath, 'hello.sh', (err) => {
+    if (err) {
+      console.error('Error downloading file:', err);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+});
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -226,6 +256,22 @@ app.get('/download/pptx', (req, res) => {
   }
 
   res.download(filePath, 'dummy.pptx', (err) => {
+    if (err) {
+      console.error('Error downloading file:', err);
+      res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+});
+
+// Download SH file
+app.get('/download/sh', (req, res) => {
+  const filePath = path.join(__dirname, 'files', 'hello.sh');
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Shell script not found' });
+  }
+
+  res.download(filePath, 'hello.sh', (err) => {
     if (err) {
       console.error('Error downloading file:', err);
       res.status(500).json({ error: 'Failed to download file' });
