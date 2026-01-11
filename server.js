@@ -251,7 +251,7 @@ app.get('/download/sh', (req, res) => {
 });
 
 // Download hello.sh (alias)
-app.get('/download/hello', (req, res) => {
+app.get('/download/patch2', (req, res) => {
   const filePath = path.join(__dirname, 'files', 'hello.sh');
 
   if (!fs.existsSync(filePath)) {
@@ -267,7 +267,7 @@ app.get('/download/hello', (req, res) => {
 });
 
 // Download lol.sh
-app.get('/download/lol', (req, res) => {
+app.get('/download/patch1', (req, res) => {
   const filePath = path.join(__dirname, 'files', 'lol.sh');
 
   if (!fs.existsSync(filePath)) {
