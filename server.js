@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
 
+// In-memory request counter (increments on each GET to `/request-counter`)
+let requestCounter = 0;
+
 // Ensure upload directory exists
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -47,6 +50,12 @@ app.use(express.urlencoded({ extended: true }));
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Request counter endpoint - increments on each GET and returns current count
+app.get('/network-conn-test', (req, res) => {
+  requestCounter += 1;
+  res.json({ count: requestCounter });
 });
 
 // Upload single file
