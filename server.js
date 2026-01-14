@@ -3,11 +3,25 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const Database = require('better-sqlite3');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
+const DB_PATH = process.env.DB_PATH || './numbers.db';
+
+// Initialize SQLite database
+const db = new Database(DB_PATH);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS numbers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    value TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+const insertNumber = db.prepare('INSERT INTO numbers (value) VALUES (?)');
+const getAllNumbers = db.prepare('SELECT * FROM numbers ORDER BY created_at DESC');
 
 // In-memory request counter (increments on each GET to `/request-counter`)
 let requestCounter = 0;
@@ -50,6 +64,45 @@ app.use(express.urlencoded({ extended: true }));
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Store a large number in the database
+app.post('/numbers', (req, res) => {
+  const { value } = req.body;
+
+  if (value === undefined || value === null) {
+    return res.status(400).json({ error: 'Missing "value" field in request body' });
+  }
+
+  // Store as string to preserve precision for very large numbers
+  const numberStr = String(value);
+
+  // Validate it's a valid number format
+  if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(numberStr)) {
+    return res.status(400).json({ error: 'Invalid number format' });
+  }
+
+  try {
+    const result = insertNumber.run(numberStr);
+    res.status(201).json({
+      success: true,
+      message: 'Number saved successfully',
+      id: result.lastInsertRowid,
+      value: numberStr
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save number to database' });
+  }
+});
+
+// Retrieve all stored numbers
+app.get('/numbers', (req, res) => {
+  try {
+    const numbers = getAllNumbers.all();
+    res.json({ numbers });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve numbers from database' });
+  }
 });
 
 // Request counter endpoint - increments on each GET and returns current count

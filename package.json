@@ -7,10 +7,15 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["rest", "api", "file-upload"],
+  "keywords": [
+    "rest",
+    "api",
+    "file-upload"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^12.6.0",
     "express": "^4.18.2",
     "multer": "^1.4.5-lts.1"
   },
