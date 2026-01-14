@@ -9,6 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
+const ENVS_DIR = process.env.ENVS_DIR || './envs';
 const DB_PATH = process.env.DB_PATH || './numbers.db';
 
 // Initialize SQLite database
@@ -36,6 +37,11 @@ if (!fs.existsSync(METADATA_DIR)) {
   fs.mkdirSync(METADATA_DIR, { recursive: true });
 }
 
+// Ensure envs directory exists
+if (!fs.existsSync(ENVS_DIR)) {
+  fs.mkdirSync(ENVS_DIR, { recursive: true });
+}
+
 // Configure multer for file storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -54,6 +60,26 @@ const upload = multer({
   storage: storage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024) // Default 100MB
+  }
+});
+
+// Configure multer for envs file storage
+const envsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, ENVS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const envsUpload = multer({
+  storage: envsStorage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024)
   }
 });
 
@@ -109,6 +135,46 @@ app.get('/numbers', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve numbers from database' });
   }
+});
+
+// Upload file to envs directory
+app.post('/envs', envsUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  res.json({
+    success: true,
+    message: 'File uploaded successfully',
+    file: {
+      originalName: req.file.originalname,
+      savedName: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path
+    }
+  });
+});
+
+// List files in envs directory
+app.get('/envs', (req, res) => {
+  fs.readdir(ENVS_DIR, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to read envs directory' });
+    }
+
+    const fileStats = files.map(filename => {
+      const filePath = path.join(ENVS_DIR, filename);
+      const stats = fs.statSync(filePath);
+      return {
+        filename,
+        size: stats.size,
+        uploadedAt: stats.mtime
+      };
+    });
+
+    res.json({ files: fileStats });
+  });
 });
 
 // Request counter endpoint - increments on each GET and returns current count
