@@ -67,15 +67,21 @@ app.get('/health', (req, res) => {
 });
 
 // Store a large number in the database
-app.post('/numbers', (req, res) => {
-  const { value } = req.body;
+// Uses raw text parsing to preserve precision for very large integers
+app.post('/numbers', express.text({ type: 'application/json' }), (req, res) => {
+  let numberStr;
 
-  if (value === undefined || value === null) {
-    return res.status(400).json({ error: 'Missing "value" field in request body' });
+  try {
+    // Parse the raw JSON string manually to extract the value without losing precision
+    // Match: {"value": 12345} or {"value": "12345"} or { "value" : 12345 }
+    const match = req.body.match(/"value"\s*:\s*"?(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"?/);
+    if (!match) {
+      return res.status(400).json({ error: 'Missing or invalid "value" field in request body' });
+    }
+    numberStr = match[1];
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid JSON format' });
   }
-
-  // Store as string to preserve precision for very large numbers
-  const numberStr = String(value);
 
   // Validate it's a valid number format
   if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(numberStr)) {
