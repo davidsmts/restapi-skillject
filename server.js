@@ -10,19 +10,269 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
 const ENVS_DIR = process.env.ENVS_DIR || './envs';
-const DB_PATH = process.env.DB_PATH || './numbers.db';
+const NUMBERS_DB_PATH = process.env.NUMBERS_DB_PATH || './numbers.db';
+const EMAILS_DB_PATH = process.env.EMAILS_DB_PATH || './emails.db';
 
-// Initialize SQLite database
-const db = new Database(DB_PATH);
-db.exec(`
+// Initialize numbers database
+const numbersDb = new Database(NUMBERS_DB_PATH);
+numbersDb.exec(`
   CREATE TABLE IF NOT EXISTS numbers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     value TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
-const insertNumber = db.prepare('INSERT INTO numbers (value) VALUES (?)');
-const getAllNumbers = db.prepare('SELECT * FROM numbers ORDER BY created_at DESC');
+const insertNumber = numbersDb.prepare('INSERT INTO numbers (value) VALUES (?)');
+const getAllNumbers = numbersDb.prepare('SELECT * FROM numbers ORDER BY created_at DESC');
+
+// Initialize emails database
+const emailsDb = new Database(EMAILS_DB_PATH);
+emailsDb.exec(`
+  CREATE TABLE IF NOT EXISTS emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT NOT NULL,
+    recipient TEXT NOT NULL,
+    cc TEXT,
+    bcc TEXT,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT DEFAULT 'sent',
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Seed emails table with realistic data if empty
+const emailCount = emailsDb.prepare('SELECT COUNT(*) as count FROM emails').get();
+if (emailCount.count === 0) {
+  const seedEmails = [
+    {
+      sender: 'marcus.chen@techcorp.io',
+      recipient: 'sarah.mitchell@devhouse.com',
+      cc: 'team-leads@techcorp.io',
+      subject: 'Re: Q4 Architecture Review Meeting',
+      body: `Hi Sarah,
+
+Thanks for sending over the preliminary docs. I've reviewed the microservices proposal and have a few thoughts on the authentication layer.
+
+Could we schedule a call for Thursday afternoon? I think we need to discuss the Redis caching strategy before the board presentation next week.
+
+Also, Tom mentioned you might have some bandwidth to help with the Kubernetes migration. Let me know if that's still the case.
+
+Best,
+Marcus`,
+      status: 'read'
+    },
+    {
+      sender: 'notifications@github.com',
+      recipient: 'dev-team@startup.io',
+      subject: '[startup-io/backend] Pull request #847: Fix connection pooling memory leak',
+      body: `@jenna-wu commented on this pull request.
+
+In src/db/pool.ts:
+
+> +    if (this.connections.length > MAX_POOL_SIZE) {
+> +      this.pruneIdleConnections();
+> +    }
+
+This looks good, but should we also add a timeout for stale connections? We've seen issues in prod where connections hang indefinitely.
+
+---
+View it on GitHub: https://github.com/startup-io/backend/pull/847`,
+      status: 'sent'
+    },
+    {
+      sender: 'hr@globalfinance.com',
+      recipient: 'all-employees@globalfinance.com',
+      subject: 'Updated Remote Work Policy - Effective January 2026',
+      body: `Dear Team,
+
+Following the recent leadership meeting, we're pleased to announce updates to our remote work policy.
+
+Key changes:
+- Flexible work arrangements now available for all departments
+- Home office stipend increased to $500/year
+- Core collaboration hours: 10 AM - 3 PM local time
+
+Please review the full policy document in the HR portal. Direct any questions to your department manager or HR business partner.
+
+Thank you for your continued dedication.
+
+Best regards,
+Human Resources`,
+      status: 'delivered'
+    },
+    {
+      sender: 'aws-notifications@amazon.com',
+      recipient: 'ops@cloudnative.dev',
+      subject: 'AWS Cost Alert: Daily spend exceeded threshold',
+      body: `Hello,
+
+Your AWS account 4821-7293-5516 has exceeded the daily spending threshold of $150.00.
+
+Current daily spend: $247.83
+Primary contributors:
+- EC2 instances: $142.50
+- RDS databases: $68.20
+- Data transfer: $37.13
+
+To review your costs, sign in to the AWS Cost Management console.
+
+This is an automated notification. Please do not reply to this email.`,
+      status: 'read'
+    },
+    {
+      sender: 'lisa.park@designstudio.co',
+      recipient: 'james.wilson@clientbrand.com',
+      cc: 'project-mx@designstudio.co',
+      subject: 'Project MX - Final mockups attached',
+      body: `Hi James,
+
+The team just wrapped up the final revisions based on your feedback from Tuesday's call.
+
+Main changes:
+- Simplified the navigation menu (removed dropdown on mobile)
+- Updated the color palette to match your brand guidelines
+- Added the animated transitions you requested for the hero section
+
+I've uploaded everything to the shared Figma workspace. The prototype link is also updated.
+
+Let me know if the stakeholders have any additional feedback before we move into development next sprint.
+
+Thanks!
+Lisa`,
+      status: 'delivered'
+    },
+    {
+      sender: 'noreply@slack.com',
+      recipient: 'michael.torres@acme.org',
+      subject: 'Slack: You have 12 unread messages in #engineering',
+      body: `You have unread messages in channels you follow.
+
+#engineering - 12 new messages
+  @rachel.kim: Has anyone tested the new CI pipeline?
+  @david.nguyen: Yeah, builds are taking 40% less time now
+  @rachel.kim: Nice! Can you share the config changes?
+
+#random - 3 new messages
+  @amy.chen: Friday lunch at the usual place?
+
+Click here to open Slack and catch up on your messages.`,
+      status: 'sent'
+    },
+    {
+      sender: 'support@vercel.com',
+      recipient: 'admin@webproject.io',
+      subject: 'Your deployment failed on webproject-prod',
+      body: `Deployment Summary
+
+Project: webproject-prod
+Commit: a3f82c1 - "Update dependencies and fix SSR hydration"
+Branch: main
+Status: Failed
+
+Error Output:
+Module not found: Can't resolve '@/components/Header'
+  at ./pages/_app.tsx:4:0
+
+Build duration: 23s
+
+View full logs: https://vercel.com/webproject/deployments/dpl_8xK2mNpQ
+
+Need help? Check our documentation or reach out to support.`,
+      status: 'read'
+    },
+    {
+      sender: 'elena.martinez@lawfirm.legal',
+      recipient: 'contracts@bigclient.com',
+      bcc: 'legal-archive@lawfirm.legal',
+      subject: 'NDA Review - Proposed amendments',
+      body: `Dear Contracts Team,
+
+I've completed the review of the mutual NDA draft you sent on Monday.
+
+Please find my proposed amendments below:
+
+Section 3.2: Suggest extending the confidentiality period from 2 years to 3 years post-termination.
+
+Section 5.1: The current language around "permitted disclosures" is too broad. I recommend limiting this to regulatory requirements only.
+
+Section 8: Standard arbitration clause should specify jurisdiction (suggest Delaware).
+
+Happy to discuss these points on a call if helpful. We're targeting execution by end of month to meet the project timeline.
+
+Regards,
+Elena Martinez, Esq.`,
+      status: 'sent'
+    }
+  ];
+
+  const insertEmail = emailsDb.prepare(`
+    INSERT INTO emails (sender, recipient, cc, bcc, subject, body, status)
+    VALUES (@sender, @recipient, @cc, @bcc, @subject, @body, @status)
+  `);
+
+  for (const email of seedEmails) {
+    insertEmail.run({
+      sender: email.sender,
+      recipient: email.recipient,
+      cc: email.cc || null,
+      bcc: email.bcc || null,
+      subject: email.subject,
+      body: email.body,
+      status: email.status
+    });
+  }
+}
+
+// Create contacts table
+emailsDb.exec(`
+  CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    email TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Helper to extract name from email address (e.g., "marcus.chen" -> "Marcus Chen")
+function extractNameFromEmail(email) {
+  const localPart = email.split('@')[0];
+  // Handle common patterns: first.last, first_last, firstlast
+  const parts = localPart.split(/[._-]/);
+  return parts
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+// Seed contacts from existing emails
+const contactCount = emailsDb.prepare('SELECT COUNT(*) as count FROM contacts').get();
+if (contactCount.count === 0) {
+  const existingEmails = emailsDb.prepare('SELECT DISTINCT sender FROM emails').all();
+  const insertContact = emailsDb.prepare(`
+    INSERT OR IGNORE INTO contacts (name, email) VALUES (@name, @email)
+  `);
+
+  for (const row of existingEmails) {
+    const name = extractNameFromEmail(row.sender);
+    insertContact.run({ name, email: row.sender });
+  }
+}
+
+// Prepared statements for emails
+const insertEmailStmt = emailsDb.prepare(`
+  INSERT INTO emails (sender, recipient, cc, bcc, subject, body, status)
+  VALUES (@sender, @recipient, @cc, @bcc, @subject, @body, @status)
+`);
+const getAllEmails = emailsDb.prepare('SELECT * FROM emails ORDER BY sent_at DESC');
+const getEmailById = emailsDb.prepare('SELECT * FROM emails WHERE id = ?');
+const deleteEmailById = emailsDb.prepare('DELETE FROM emails WHERE id = ?');
+const deleteAllEmails = emailsDb.prepare('DELETE FROM emails');
+
+// Prepared statements for contacts
+const insertContact = emailsDb.prepare(`
+  INSERT OR IGNORE INTO contacts (name, email) VALUES (@name, @email)
+`);
+const getAllContacts = emailsDb.prepare('SELECT * FROM contacts ORDER BY name ASC');
 
 // In-memory request counter (increments on each GET to `/request-counter`)
 let requestCounter = 0;
@@ -134,6 +384,134 @@ app.get('/numbers', (req, res) => {
     res.json({ numbers });
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve numbers from database' });
+  }
+});
+
+// Send a new email
+app.post('/emails', (req, res) => {
+  const { from, to, subject, body, cc, bcc } = req.body;
+
+  if (!from || !to || !subject || !body) {
+    return res.status(400).json({
+      error: 'Missing required fields: from, to, subject, and body are required'
+    });
+  }
+
+  try {
+    const result = insertEmailStmt.run({
+      sender: from,
+      recipient: to,
+      cc: cc || null,
+      bcc: bcc || null,
+      subject,
+      body,
+      status: 'sent'
+    });
+
+    // Add sender to contacts
+    const name = extractNameFromEmail(from);
+    insertContact.run({ name, email: from });
+
+    res.status(201).json({
+      success: true,
+      message: 'Email sent successfully',
+      email: {
+        id: result.lastInsertRowid,
+        from,
+        to,
+        cc: cc || null,
+        bcc: bcc || null,
+        subject,
+        body,
+        status: 'sent'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// Get all contacts
+app.get('/contacts', (req, res) => {
+  try {
+    const contacts = getAllContacts.all();
+    res.json({ contacts });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve contacts' });
+  }
+});
+
+// Get all emails with optional filters
+app.get('/emails', (req, res) => {
+  const { from, to, status, limit } = req.query;
+
+  try {
+    let emails = getAllEmails.all();
+
+    if (from) {
+      emails = emails.filter(e => e.sender.toLowerCase().includes(from.toLowerCase()));
+    }
+    if (to) {
+      emails = emails.filter(e => e.recipient.toLowerCase().includes(to.toLowerCase()));
+    }
+    if (status) {
+      emails = emails.filter(e => e.status === status);
+    }
+    if (limit) {
+      emails = emails.slice(0, parseInt(limit));
+    }
+
+    res.json({ emails });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve emails' });
+  }
+});
+
+// Get a specific email by ID
+app.get('/emails/:id', (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const email = getEmailById.get(id);
+
+    if (!email) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    res.json({ email });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve email' });
+  }
+});
+
+// Delete a specific email by ID
+app.delete('/emails/:id', (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const email = getEmailById.get(id);
+
+    if (!email) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    deleteEmailById.run(id);
+    res.json({ success: true, message: 'Email deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete email' });
+  }
+});
+
+// Delete all emails
+app.delete('/emails', (req, res) => {
+  try {
+    const result = deleteAllEmails.run();
+    res.json({
+      success: true,
+      message: `Deleted ${result.changes} email(s)`
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete emails' });
   }
 });
 
