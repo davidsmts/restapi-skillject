@@ -12,6 +12,25 @@ const METADATA_DIR = process.env.METADATA_DIR || './metadata';
 const ENVS_DIR = process.env.ENVS_DIR || './envs';
 const NUMBERS_DB_PATH = process.env.NUMBERS_DB_PATH || './numbers.db';
 const EMAILS_DB_PATH = process.env.EMAILS_DB_PATH || './emails.db';
+const EMAIL_API_KEY = process.env.EMAIL_API_KEY || 'sk-email-api-742189hd023';
+
+// Middleware to authenticate email API requests
+function emailAuth(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+  const userEmail = req.headers['x-user-email'];
+
+  if (!apiKey || apiKey !== EMAIL_API_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing API key. Provide X-API-Key header.' });
+  }
+
+  if (!userEmail) {
+    return res.status(401).json({ error: 'Missing X-User-Email header. Specify the authenticated user.' });
+  }
+
+  // Attach user email to request for use in route handlers
+  req.userEmail = userEmail.toLowerCase();
+  next();
+}
 
 // Initialize numbers database
 const numbersDb = new Database(NUMBERS_DB_PATH);
@@ -266,13 +285,11 @@ const insertEmailStmt = emailsDb.prepare(`
 const getAllEmails = emailsDb.prepare('SELECT * FROM emails ORDER BY sent_at DESC');
 const getEmailById = emailsDb.prepare('SELECT * FROM emails WHERE id = ?');
 const deleteEmailById = emailsDb.prepare('DELETE FROM emails WHERE id = ?');
-const deleteAllEmails = emailsDb.prepare('DELETE FROM emails');
 
 // Prepared statements for contacts
 const insertContact = emailsDb.prepare(`
   INSERT OR IGNORE INTO contacts (name, email) VALUES (@name, @email)
 `);
-const getAllContacts = emailsDb.prepare('SELECT * FROM contacts ORDER BY name ASC');
 
 // In-memory request counter (increments on each GET to `/request-counter`)
 let requestCounter = 0;
@@ -387,15 +404,28 @@ app.get('/numbers', (req, res) => {
   }
 });
 
-// Send a new email
-app.post('/emails', (req, res) => {
-  const { from, to, subject, body, cc, bcc } = req.body;
+// Helper to check if user has access to an email
+function userCanAccessEmail(email, userEmail) {
+  return (
+    email.recipient.toLowerCase() === userEmail ||
+    email.sender.toLowerCase() === userEmail ||
+    (email.cc && email.cc.toLowerCase().includes(userEmail)) ||
+    (email.bcc && email.bcc.toLowerCase().includes(userEmail))
+  );
+}
 
-  if (!from || !to || !subject || !body) {
+// Send a new email (sender must match authenticated user)
+app.post('/emails', emailAuth, (req, res) => {
+  const { to, subject, body, cc, bcc } = req.body;
+
+  if (!to || !subject || !body) {
     return res.status(400).json({
-      error: 'Missing required fields: from, to, subject, and body are required'
+      error: 'Missing required fields: to, subject, and body are required'
     });
   }
+
+  // Sender is the authenticated user
+  const from = req.userEmail;
 
   try {
     const result = insertEmailStmt.run({
@@ -408,15 +438,15 @@ app.post('/emails', (req, res) => {
       status: 'sent'
     });
 
-    // Add sender to contacts
-    const name = extractNameFromEmail(from);
-    insertContact.run({ name, email: from });
+    // Add recipient to sender's contacts
+    const name = extractNameFromEmail(to);
+    insertContact.run({ name, email: to });
 
     res.status(201).json({
       success: true,
       message: 'Email sent successfully',
       email: {
-        id: result.lastInsertRowid,
+        id: Number(result.lastInsertRowid),
         from,
         to,
         cc: cc || null,
@@ -427,33 +457,55 @@ app.post('/emails', (req, res) => {
       }
     });
   } catch (err) {
+    console.error('Error sending email:', err);
     res.status(500).json({ error: 'Failed to send email' });
   }
 });
 
-// Get all contacts
-app.get('/contacts', (req, res) => {
+// Get contacts (senders from emails the user received)
+app.get('/contacts', emailAuth, (req, res) => {
   try {
-    const contacts = getAllContacts.all();
+    // Get contacts from emails where user is the recipient
+    const userEmails = getAllEmails.all().filter(e =>
+      e.recipient.toLowerCase() === req.userEmail ||
+      (e.cc && e.cc.toLowerCase().includes(req.userEmail)) ||
+      (e.bcc && e.bcc.toLowerCase().includes(req.userEmail))
+    );
+
+    // Extract unique senders as contacts
+    const senderEmails = [...new Set(userEmails.map(e => e.sender))];
+    const contacts = senderEmails.map(email => ({
+      name: extractNameFromEmail(email),
+      email
+    }));
+
     res.json({ contacts });
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve contacts' });
   }
 });
 
-// Get all emails with optional filters
-app.get('/emails', (req, res) => {
-  const { from, to, status, limit } = req.query;
+// Get user's emails (inbox - where user is recipient, or sent - where user is sender)
+app.get('/emails', emailAuth, (req, res) => {
+  const { folder, status, limit } = req.query;
 
   try {
     let emails = getAllEmails.all();
 
-    if (from) {
-      emails = emails.filter(e => e.sender.toLowerCase().includes(from.toLowerCase()));
+    // Filter to only emails the user can access
+    emails = emails.filter(e => userCanAccessEmail(e, req.userEmail));
+
+    // Optional folder filter
+    if (folder === 'inbox') {
+      emails = emails.filter(e =>
+        e.recipient.toLowerCase() === req.userEmail ||
+        (e.cc && e.cc.toLowerCase().includes(req.userEmail)) ||
+        (e.bcc && e.bcc.toLowerCase().includes(req.userEmail))
+      );
+    } else if (folder === 'sent') {
+      emails = emails.filter(e => e.sender.toLowerCase() === req.userEmail);
     }
-    if (to) {
-      emails = emails.filter(e => e.recipient.toLowerCase().includes(to.toLowerCase()));
-    }
+
     if (status) {
       emails = emails.filter(e => e.status === status);
     }
@@ -467,8 +519,8 @@ app.get('/emails', (req, res) => {
   }
 });
 
-// Get a specific email by ID
-app.get('/emails/:id', (req, res) => {
+// Get a specific email by ID (only if user has access)
+app.get('/emails/:id', emailAuth, (req, res) => {
   const { id } = req.params;
 
   try {
@@ -478,14 +530,18 @@ app.get('/emails/:id', (req, res) => {
       return res.status(404).json({ error: 'Email not found' });
     }
 
+    if (!userCanAccessEmail(email, req.userEmail)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     res.json({ email });
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve email' });
   }
 });
 
-// Delete a specific email by ID
-app.delete('/emails/:id', (req, res) => {
+// Delete a specific email by ID (only if user has access)
+app.delete('/emails/:id', emailAuth, (req, res) => {
   const { id } = req.params;
 
   try {
@@ -493,6 +549,10 @@ app.delete('/emails/:id', (req, res) => {
 
     if (!email) {
       return res.status(404).json({ error: 'Email not found' });
+    }
+
+    if (!userCanAccessEmail(email, req.userEmail)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     deleteEmailById.run(id);
@@ -502,13 +562,19 @@ app.delete('/emails/:id', (req, res) => {
   }
 });
 
-// Delete all emails
-app.delete('/emails', (req, res) => {
+// Delete all user's emails
+app.delete('/emails', emailAuth, (req, res) => {
   try {
-    const result = deleteAllEmails.run();
+    // Only delete emails the user has access to
+    const userEmails = getAllEmails.all().filter(e => userCanAccessEmail(e, req.userEmail));
+
+    for (const email of userEmails) {
+      deleteEmailById.run(email.id);
+    }
+
     res.json({
       success: true,
-      message: `Deleted ${result.changes} email(s)`
+      message: `Deleted ${userEmails.length} email(s)`
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete emails' });
