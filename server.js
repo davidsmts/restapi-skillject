@@ -65,11 +65,11 @@ const emailCount = emailsDb.prepare('SELECT COUNT(*) as count FROM emails').get(
 if (emailCount.count === 0) {
   const seedEmails = [
     {
-      sender: 'marcus.chen@techcorp.io',
-      recipient: 'sarah.mitchell@devhouse.com',
-      cc: 'team-leads@techcorp.io',
+      sender: 'm.chen@foliobyte.com',
+      recipient: 's.kowalski@vektralabs.de',
+      cc: 'engineering@foliobyte.com',
       subject: 'Re: Q4 Architecture Review Meeting',
-      body: `Hi Sarah,
+      body: `Hi Sandra,
 
 Thanks for sending over the preliminary docs. I've reviewed the microservices proposal and have a few thoughts on the authentication layer.
 
@@ -82,69 +82,65 @@ Marcus`,
       status: 'read'
     },
     {
-      sender: 'notifications@github.com',
-      recipient: 'dev-team@startup.io',
-      subject: '[startup-io/backend] Pull request #847: Fix connection pooling memory leak',
-      body: `@jenna-wu commented on this pull request.
+      sender: 'jwu@prismsoft.io',
+      recipient: 'r.nakamura@prismsoft.io',
+      cc: 'd.okonkwo@prismsoft.io',
+      subject: 'Re: Connection pooling fix',
+      body: `Hey Riku,
 
-In src/db/pool.ts:
+Took a look at your PR for the connection pooling memory leak. The changes in src/db/pool.ts look solid.
 
-> +    if (this.connections.length > MAX_POOL_SIZE) {
-> +      this.pruneIdleConnections();
-> +    }
+One thought - should we also add a timeout for stale connections? We've seen issues in prod where connections hang indefinitely. Maybe something like 30s?
 
-This looks good, but should we also add a timeout for stale connections? We've seen issues in prod where connections hang indefinitely.
+Let me know what you think. Happy to pair on this tomorrow if needed.
 
----
-View it on GitHub: https://github.com/startup-io/backend/pull/847`,
+- Jenna`,
       status: 'sent'
     },
     {
-      sender: 'hr@globalfinance.com',
-      recipient: 'all-employees@globalfinance.com',
-      subject: 'Updated Remote Work Policy - Effective January 2026',
-      body: `Dear Team,
+      sender: 'a.bergmann@quintel.ch',
+      recipient: 't.williams@quintel.ch',
+      subject: 'Updated Remote Work Policy - Effective February',
+      body: `Hi Tyler,
 
-Following the recent leadership meeting, we're pleased to announce updates to our remote work policy.
+Following the recent leadership meeting, we're updating our remote work policy.
 
 Key changes:
 - Flexible work arrangements now available for all departments
-- Home office stipend increased to $500/year
-- Core collaboration hours: 10 AM - 3 PM local time
+- Home office stipend increased to CHF 450/year
+- Core collaboration hours: 10 AM - 3 PM CET
 
-Please review the full policy document in the HR portal. Direct any questions to your department manager or HR business partner.
+Please review the full policy document in the HR portal. Let me know if you have any questions before the all-hands on Friday.
 
-Thank you for your continued dedication.
-
-Best regards,
-Human Resources`,
+Best,
+Anna`,
       status: 'delivered'
     },
     {
-      sender: 'aws-notifications@amazon.com',
-      recipient: 'ops@cloudnative.dev',
-      subject: 'AWS Cost Alert: Daily spend exceeded threshold',
+      sender: 'billing@cloudmetrics.net',
+      recipient: 'p.santos@ridgeline.tech',
+      subject: 'Monthly usage report - January 2026',
       body: `Hello,
 
-Your AWS account 4821-7293-5516 has exceeded the daily spending threshold of $150.00.
+Your CloudMetrics account (ID: CM-4821-7293) monthly summary is ready.
 
-Current daily spend: $247.83
+Current month spend: $247.83
 Primary contributors:
-- EC2 instances: $142.50
-- RDS databases: $68.20
+- Compute instances: $142.50
+- Database clusters: $68.20
 - Data transfer: $37.13
 
-To review your costs, sign in to the AWS Cost Management console.
+Your spend is 18% higher than last month. View detailed breakdown in your dashboard.
 
-This is an automated notification. Please do not reply to this email.`,
+This is an automated notification.`,
       status: 'read'
     },
     {
-      sender: 'lisa.park@designstudio.co',
-      recipient: 'james.wilson@clientbrand.com',
-      cc: 'project-mx@designstudio.co',
-      subject: 'Project MX - Final mockups attached',
-      body: `Hi James,
+      sender: 'l.dubois@atelier9.fr',
+      recipient: 'k.johansson@northwave.se',
+      cc: 'design@atelier9.fr',
+      subject: 'Northwave rebrand - Final mockups ready',
+      body: `Hi Katarina,
 
 The team just wrapped up the final revisions based on your feedback from Tuesday's call.
 
@@ -155,36 +151,36 @@ Main changes:
 
 I've uploaded everything to the shared Figma workspace. The prototype link is also updated.
 
-Let me know if the stakeholders have any additional feedback before we move into development next sprint.
+Let me know if the stakeholders have any additional feedback before we move into development.
 
-Thanks!
-Lisa`,
+Merci!
+Louise`,
       status: 'delivered'
     },
     {
-      sender: 'noreply@slack.com',
-      recipient: 'michael.torres@acme.org',
-      subject: 'Slack: You have 12 unread messages in #engineering',
-      body: `You have unread messages in channels you follow.
+      sender: 'n.adeyemi@lumoscap.com',
+      recipient: 'c.reyes@lumoscap.com',
+      subject: 'Quick sync on the Henderson deal?',
+      body: `Hey Carlos,
 
-#engineering - 12 new messages
-  @rachel.kim: Has anyone tested the new CI pipeline?
-  @david.nguyen: Yeah, builds are taking 40% less time now
-  @rachel.kim: Nice! Can you share the config changes?
+Got a few minutes today? Want to run through the Henderson term sheet before we send it over. A couple of things I want your take on:
 
-#random - 3 new messages
-  @amy.chen: Friday lunch at the usual place?
+1. The liquidation preference - they're pushing for 1.5x
+2. Board seat composition
+3. Anti-dilution provisions
 
-Click here to open Slack and catch up on your messages.`,
+I'm free after 2pm. Grab a coffee in the kitchen?
+
+- Nneka`,
       status: 'sent'
     },
     {
-      sender: 'support@vercel.com',
-      recipient: 'admin@webproject.io',
-      subject: 'Your deployment failed on webproject-prod',
-      body: `Deployment Summary
+      sender: 'build@deploybot.io',
+      recipient: 'h.tanaka@pixelframe.jp',
+      subject: '[pixelframe/webapp] Build failed on main',
+      body: `Build Summary
 
-Project: webproject-prod
+Project: pixelframe-webapp
 Commit: a3f82c1 - "Update dependencies and fix SSR hydration"
 Branch: main
 Status: Failed
@@ -195,19 +191,17 @@ Module not found: Can't resolve '@/components/Header'
 
 Build duration: 23s
 
-View full logs: https://vercel.com/webproject/deployments/dpl_8xK2mNpQ
-
-Need help? Check our documentation or reach out to support.`,
+View full logs in your DeployBot dashboard.`,
       status: 'read'
     },
     {
-      sender: 'elena.martinez@lawfirm.legal',
-      recipient: 'contracts@bigclient.com',
-      bcc: 'legal-archive@lawfirm.legal',
-      subject: 'NDA Review - Proposed amendments',
-      body: `Dear Contracts Team,
+      sender: 'e.volkov@greystone.law',
+      recipient: 'legal@meridianvc.com',
+      bcc: 'e.volkov@greystone.law',
+      subject: 'Re: Series B docs - proposed amendments',
+      body: `Dear Counsel,
 
-I've completed the review of the mutual NDA draft you sent on Monday.
+I've completed the review of the Series B financing documents.
 
 Please find my proposed amendments below:
 
@@ -217,10 +211,11 @@ Section 5.1: The current language around "permitted disclosures" is too broad. I
 
 Section 8: Standard arbitration clause should specify jurisdiction (suggest Delaware).
 
-Happy to discuss these points on a call if helpful. We're targeting execution by end of month to meet the project timeline.
+Happy to discuss on a call. We're targeting execution by end of month.
 
 Regards,
-Elena Martinez, Esq.`,
+Elena Volkov
+Associate, Greystone LLP`,
       status: 'sent'
     }
   ];
@@ -462,22 +457,23 @@ app.post('/emails', emailAuth, (req, res) => {
   }
 });
 
-// Get contacts (senders from emails the user received)
+// Get all contacts
 app.get('/contacts', emailAuth, (req, res) => {
   try {
-    // Get contacts from emails where user is the recipient
-    const userEmails = getAllEmails.all().filter(e =>
-      e.recipient.toLowerCase() === req.userEmail ||
-      (e.cc && e.cc.toLowerCase().includes(req.userEmail)) ||
-      (e.bcc && e.bcc.toLowerCase().includes(req.userEmail))
-    );
+    // Get all unique email addresses from senders and recipients
+    const allEmails = getAllEmails.all();
+    const emailAddresses = new Set();
 
-    // Extract unique senders as contacts
-    const senderEmails = [...new Set(userEmails.map(e => e.sender))];
-    const contacts = senderEmails.map(email => ({
+    for (const email of allEmails) {
+      emailAddresses.add(email.sender);
+      emailAddresses.add(email.recipient);
+      if (email.cc) emailAddresses.add(email.cc);
+    }
+
+    const contacts = [...emailAddresses].map(email => ({
       name: extractNameFromEmail(email),
       email
-    }));
+    })).sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({ contacts });
   } catch (err) {
