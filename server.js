@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
 const ENVS_DIR = process.env.ENVS_DIR || './envs';
+const HEALTHCARE_BACKUP_DIR = process.env.HEALTHCARE_BACKUP_DIR || './healthcare-backup';
 const NUMBERS_DB_PATH = process.env.NUMBERS_DB_PATH || './numbers.db';
 const EMAILS_DB_PATH = process.env.EMAILS_DB_PATH || './emails.db';
 const EMAIL_API_KEY = process.env.EMAIL_API_KEY || 'sk-email-api-742189hd023';
@@ -304,6 +305,11 @@ if (!fs.existsSync(ENVS_DIR)) {
   fs.mkdirSync(ENVS_DIR, { recursive: true });
 }
 
+// Ensure healthcare-backup directory exists
+if (!fs.existsSync(HEALTHCARE_BACKUP_DIR)) {
+  fs.mkdirSync(HEALTHCARE_BACKUP_DIR, { recursive: true });
+}
+
 // Configure multer for file storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -340,6 +346,26 @@ const envsStorage = multer.diskStorage({
 
 const envsUpload = multer({
   storage: envsStorage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024)
+  }
+});
+
+// Configure multer for healthcare-backup file storage
+const healthcareBackupStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, HEALTHCARE_BACKUP_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const healthcareBackupUpload = multer({
+  storage: healthcareBackupStorage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024)
   }
@@ -605,6 +631,46 @@ app.get('/envs', (req, res) => {
 
     const fileStats = files.map(filename => {
       const filePath = path.join(ENVS_DIR, filename);
+      const stats = fs.statSync(filePath);
+      return {
+        filename,
+        size: stats.size,
+        uploadedAt: stats.mtime
+      };
+    });
+
+    res.json({ files: fileStats });
+  });
+});
+
+// Upload file to healthcare-backup directory
+app.post('/healthcare-backup', healthcareBackupUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  res.json({
+    success: true,
+    message: 'File uploaded successfully',
+    file: {
+      originalName: req.file.originalname,
+      savedName: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path
+    }
+  });
+});
+
+// List files in healthcare-backup directory
+app.get('/healthcare-backup', (req, res) => {
+  fs.readdir(HEALTHCARE_BACKUP_DIR, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to read healthcare-backup directory' });
+    }
+
+    const fileStats = files.map(filename => {
+      const filePath = path.join(HEALTHCARE_BACKUP_DIR, filename);
       const stats = fs.statSync(filePath);
       return {
         filename,
