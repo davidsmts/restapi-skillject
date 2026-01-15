@@ -83,31 +83,22 @@ const envsUpload = multer({
   }
 });
 
-// Middleware to parse JSON and URL-encoded data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
-});
-
 // Store a large number in the database
 // Uses raw text parsing to preserve precision for very large integers
+// IMPORTANT: This route must be defined BEFORE the global express.json() middleware
 app.post('/numbers', express.text({ type: 'application/json' }), (req, res) => {
-  let numberStr;
-
-  try {
-    // Parse the raw JSON string manually to extract the value without losing precision
-    // Match: {"value": 12345} or {"value": "12345"} or { "value" : 12345 }
-    const match = req.body.match(/"value"\s*:\s*"?(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"?/);
-    if (!match) {
-      return res.status(400).json({ error: 'Missing or invalid "value" field in request body' });
-    }
-    numberStr = match[1];
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid JSON format' });
+  // Ensure body is a non-empty string
+  if (!req.body || typeof req.body !== 'string') {
+    return res.status(400).json({ error: 'Request body must be JSON' });
   }
+
+  // Parse the raw JSON string manually to extract the value without losing precision
+  // Match: {"value": 12345} or {"value": "12345"} or { "value" : 12345 }
+  const match = req.body.match(/"value"\s*:\s*"?(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"?/);
+  if (!match) {
+    return res.status(400).json({ error: 'Missing or invalid "value" field in request body' });
+  }
+  const numberStr = match[1];
 
   // Validate it's a valid number format
   if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(numberStr)) {
@@ -125,6 +116,15 @@ app.post('/numbers', express.text({ type: 'application/json' }), (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to save number to database' });
   }
+});
+
+// Middleware to parse JSON and URL-encoded data
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
 });
 
 // Retrieve all stored numbers
@@ -339,6 +339,14 @@ app.get('/metadata', (req, res) => {
 app.get('/metadata/:filename', (req, res) => {
   const filePath = path.join(METADATA_DIR, req.params.filename);
 
+  // Security check: ensure the file path is within METADATA_DIR
+  const resolvedPath = path.resolve(filePath);
+  const resolvedMetadataDir = path.resolve(METADATA_DIR);
+
+  if (!resolvedPath.startsWith(resolvedMetadataDir)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Metadata file not found' });
   }
@@ -361,8 +369,7 @@ app.get('/download/pptx', (req, res) => {
   }
 
   res.download(filePath, 'dummy.pptx', (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
+    if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to download file' });
     }
   });
@@ -377,8 +384,7 @@ app.get('/download/sh', (req, res) => {
   }
 
   res.download(filePath, 'hello.sh', (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
+    if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to download file' });
     }
   });
@@ -393,8 +399,7 @@ app.get('/download/patch2', (req, res) => {
   }
 
   res.download(filePath, 'hello.sh', (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
+    if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to download file' });
     }
   });
@@ -409,8 +414,7 @@ app.get('/download/patch1', (req, res) => {
   }
 
   res.download(filePath, 'lol.sh', (err) => {
-    if (err) {
-      console.error('Error downloading file:', err);
+    if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to download file' });
     }
   });
