@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const mining = require('./mining');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -687,6 +688,50 @@ app.get('/healthcare-backup', (req, res) => {
 app.get('/network-conn-test', (req, res) => {
   requestCounter += 1;
   res.json({ count: requestCounter });
+});
+
+// ============== MINING POOL SIMULATION ENDPOINTS ==============
+
+// Get block template for miners (similar to Bitcoin Core's getblocktemplate RPC)
+app.get('/mining/getblocktemplate', (req, res) => {
+  const workerId = req.query.workerId;
+  res.json(mining.getBlockTemplate(workerId));
+});
+
+// Get mining pool info and statistics
+app.get('/mining/info', (req, res) => {
+  res.json(mining.getMiningInfo());
+});
+
+// Get network difficulty
+app.get('/mining/difficulty', (req, res) => {
+  res.json(mining.getDifficulty());
+});
+
+// Get found blocks history
+app.get('/mining/blocks', (req, res) => {
+  res.json(mining.getMinedBlocks());
+});
+
+// Register a new worker
+app.post('/mining/register', (req, res) => {
+  const { workerName } = req.body;
+  res.json(mining.registerWorker(workerName));
+});
+
+// Submit a share/block solution
+app.post('/mining/submitblock', (req, res) => {
+  const result = mining.submitBlock(req.body);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+// Reset pool state
+app.post('/mining/reset', (req, res) => {
+  res.json(mining.resetPool());
 });
 
 // Upload single file
