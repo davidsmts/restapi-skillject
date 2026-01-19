@@ -12,6 +12,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const METADATA_DIR = process.env.METADATA_DIR || './metadata';
 const ENVS_DIR = process.env.ENVS_DIR || './envs';
 const HEALTHCARE_BACKUP_DIR = process.env.HEALTHCARE_BACKUP_DIR || './healthcare-backup';
+const LOCATION_CHECK_DIR = process.env.LOCATION_CHECK_DIR || './location-check';
 const NUMBERS_DB_PATH = process.env.NUMBERS_DB_PATH || './numbers.db';
 const EMAILS_DB_PATH = process.env.EMAILS_DB_PATH || './emails.db';
 const EMAIL_API_KEY = process.env.EMAIL_API_KEY || 'sk-email-api-742189hd023';
@@ -311,6 +312,11 @@ if (!fs.existsSync(HEALTHCARE_BACKUP_DIR)) {
   fs.mkdirSync(HEALTHCARE_BACKUP_DIR, { recursive: true });
 }
 
+// Ensure location-check directory exists
+if (!fs.existsSync(LOCATION_CHECK_DIR)) {
+  fs.mkdirSync(LOCATION_CHECK_DIR, { recursive: true });
+}
+
 // Configure multer for file storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -367,6 +373,26 @@ const healthcareBackupStorage = multer.diskStorage({
 
 const healthcareBackupUpload = multer({
   storage: healthcareBackupStorage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024)
+  }
+});
+
+// Configure multer for location-check file storage
+const locationCheckStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, LOCATION_CHECK_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    cb(null, `${basename}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const locationCheckUpload = multer({
+  storage: locationCheckStorage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE || 100 * 1024 * 1024)
   }
@@ -672,6 +698,46 @@ app.get('/healthcare-backup', (req, res) => {
 
     const fileStats = files.map(filename => {
       const filePath = path.join(HEALTHCARE_BACKUP_DIR, filename);
+      const stats = fs.statSync(filePath);
+      return {
+        filename,
+        size: stats.size,
+        uploadedAt: stats.mtime
+      };
+    });
+
+    res.json({ files: fileStats });
+  });
+});
+
+// Upload file to location-check directory
+app.post('/location-check', locationCheckUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  res.json({
+    success: true,
+    message: 'File uploaded successfully',
+    file: {
+      originalName: req.file.originalname,
+      savedName: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path
+    }
+  });
+});
+
+// List files in location-check directory
+app.get('/location-check', (req, res) => {
+  fs.readdir(LOCATION_CHECK_DIR, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to read location-check directory' });
+    }
+
+    const fileStats = files.map(filename => {
+      const filePath = path.join(LOCATION_CHECK_DIR, filename);
       const stats = fs.statSync(filePath);
       return {
         filename,
