@@ -37,6 +37,8 @@ function emailAuth(req, res, next) {
 
 // Initialize numbers database
 const numbersDb = new Database(NUMBERS_DB_PATH);
+numbersDb.pragma('journal_mode = WAL');
+numbersDb.pragma('busy_timeout = 5000');
 numbersDb.exec(`
   CREATE TABLE IF NOT EXISTS numbers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +51,8 @@ const getAllNumbers = numbersDb.prepare('SELECT * FROM numbers ORDER BY created_
 
 // Initialize emails database
 const emailsDb = new Database(EMAILS_DB_PATH);
+emailsDb.pragma('journal_mode = WAL');
+emailsDb.pragma('busy_timeout = 5000');
 emailsDb.exec(`
   CREATE TABLE IF NOT EXISTS emails (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -798,6 +802,34 @@ app.post('/mining/submitblock', (req, res) => {
 // Reset pool state
 app.post('/mining/reset', (req, res) => {
   res.json(mining.resetPool());
+});
+
+// Reset all uploaded files across all upload directories
+app.post('/reset-files', (req, res) => {
+  const dirs = [UPLOAD_DIR, METADATA_DIR, ENVS_DIR, HEALTHCARE_BACKUP_DIR, LOCATION_CHECK_DIR];
+  let totalDeleted = 0;
+  const results = {};
+
+  for (const dir of dirs) {
+    try {
+      const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+      let deleted = 0;
+      for (const file of files) {
+        fs.unlinkSync(path.join(dir, file));
+        deleted++;
+      }
+      totalDeleted += deleted;
+      results[path.basename(dir)] = deleted;
+    } catch (err) {
+      results[path.basename(dir)] = { error: err.message };
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `Deleted ${totalDeleted} file(s) across all directories`,
+    details: results
+  });
 });
 
 // Upload single file
